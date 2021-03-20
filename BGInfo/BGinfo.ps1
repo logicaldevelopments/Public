@@ -1,310 +1,128 @@
-﻿<#
-.Synopsis
-   bginfo.ps1
-.DESCRIPTION
-    Bginfo solution, adding text on the background, and text is fully customable down in the script.
-    Change the #Writing info to the background part
+<#
+.SYNOPSIS
 
-    You can even force a background in this script
-    #Set-Wallpaper -Path "C:\Windows\Web\Wallpaper\Windows\img0.jpg" -Style stretch
+A script used to download, install and configure the latest BgInfo version on a Windows Server 2016 or 2019.
+
+.DESCRIPTION
+
+A script used to download, install and configure the latest BgInfo version (v4.27) on a Windows Server 2016 or 2019. The BgInfo folder will be created on the C: drive if the folder does not already exist. 
+Then the latest BgInfo.zip file will be downloaded and extracted in the BgInfo folder. The LogonBgi.zip file which holds the preferred settings will also be downloaded and extracted to the BgInfo folder. 
+After extraction both .zip files will be deleted. A registry key (regkey) to AutoStart the BgInfo tool in combination with the logon.bgi config file will be created. At the end of the script BgInfo will 
+be started for the first time and the PowerShell window will be closed.
+
+.NOTES
+
+File Name:      BgInfo_Automated_Windows_Server_2016_2019.ps1
+Created:        08/09/2019
+Last modified:  13/09/2019
+Author:         Wim Matthyssen
+PowerShell:     5.1 or above 
+Requires:       -RunAsAdministrator
+OS:             Windows Server 2016 and Windows Server 2019
+Version:        2.2
+Action:         Change variables were needed to fit your needs
+Disclaimer:     This script is provided "As Is" with no warranties.
+
+.EXAMPLE
+
+.\BgInfo_Automated_Windows_Server_2016_2019.ps1
+
+.LINK
+
+https://tinyurl.com/y3wmsh7o
 #>
 
+## Variables
 
-Function Reset-WallPaper($Value)
+$bgInfoFolder = "C:\BgInfo"
+$bgInfoFolderContent = $bgInfoFolder + "\*"
+$itemType = "Directory"
+$bgInfoUrl = "https://download.sysinternals.com/files/BGInfo.zip"
+$bgInfoZip = "C:\BgInfo\BGInfo.zip"
+$bgInfoEula = "C:\BgInfo\Eula.txt"
+$logonBgiUrl = "https://tinyurl.com/yxlxbgun"
+$logonBgiZip = "C:\BgInfo\LogonBgi.zip"
+$bgInfoRegPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run"
+$bgInfoRegKey = "BgInfo"
+$bgInfoRegType = "String"
+$bgInfoRegKeyValue = "C:\BgInfo\Bginfo64.exe C:\BgInfo\logon.bgi /timer:0 /nolicprompt"
+$regKeyExists = (Get-Item $bgInfoRegPath -EA Ignore).Property -contains $bgInfoRegkey
+$writeEmptyLine = "`n"
+$writeSeperator = " - "
+$time = Get-Date -UFormat "%A %m/%d/%Y %R"
+$foregroundColor1 = "Yellow"
+$foregroundColor2 = "Red"
 
-{
+##-------------------------------------------------------------------------------------------------------------------------------------------------------
 
- Set-ItemProperty -path 'HKCU:\Control Panel\Desktop\' -name wallpaper -value "C:\Windows\Web\Wallpaper\Windows\img0.jpg"
+## Write Download started
 
- rundll32.exe user32.dll, UpdatePerUserSystemParameters
+Write-Host ($writeEmptyLine + "# BgInfo download started" + $writeSeperator + $time)`
+-foregroundcolor $foregroundColor1 $writeEmptyLine 
 
-}
+##-------------------------------------------------------------------------------------------------------------------------------------------------------
 
-Reset-Wallpaper -Path "C:\Windows\Web\Wallpaper\Windows\img0.jpg" -Style Fill
+## Create BgInfo folder on C: if not exists, else delete its content
 
+If (!(Test-Path -Path $bgInfoFolder)){New-Item -ItemType $itemType -Force -Path $bgInfoFolder
+   Write-Host ($writeEmptyLine + "# BgInfo folder created" + $writeSeperator + $time)`
+   -foregroundcolor $foregroundColor1 $writeEmptyLine
+}Else{Write-Host ($writeEmptyLine + "# BgInfo folder already exists" + $writeSeperator + $time)`
+   -foregroundcolor $foregroundColor2 $writeEmptyLine
+   Remove-Item $bgInfoFolderContent -Force -Recurse -ErrorAction SilentlyContinue
+   Write-Host ($writeEmptyLine + "# Content existing BgInfo folder deleted" + $writeSeperator + $time)`
+   -foregroundcolor $foregroundColor2 $writeEmptyLine}
 
-Function New-BGinfo {
-    Param(  [Parameter(Mandatory)]
-            [string] $Text,
- 
-            [Parameter()]
-            [string] $OutFile=“$($env:temp)\” + ( ( get-date ).TimeOfDay.TotalSeconds ) + “BGInfo.bmp”,
- 
-            [Parameter()]
-            [ValidateSet("Left","Center")]
-            [string]$Align="Left",
- 
- 
-            [Parameter()]
-            [ValidateSet("Current","Blue","Grey","Black")]
-            [string]$Theme="Current",
- 
-            [Parameter()]
-            [string]$FontName="Segoe UI",
- 
-            [Parameter()]
-            [ValidateRange(9,45)]
-            [int32]$FontSize = 20,
- 
-            [Parameter()]
-            [switch]$UseCurrentWallpaperAsSource
-    )
-    Begin {
+ ##-------------------------------------------------------------------------------------------------------------------------------------------------------
 
-        # Enumerate current wallpaper now, so we can decide whether it's a solid colour or not
-        try {
-            $wpath = (Get-ItemProperty 'HKCU:\Control Panel\Desktop' -Name WallPaper -ErrorAction Stop).WallPaper
-            if ($wpath.Length -eq 1) {
-                # Solid colour used
-                $UseCurrentWallpaperAsSource = $false
-                $Theme = "Current"
-            }
-        } catch {
-            $UseCurrentWallpaperAsSource = $false
-            $Theme = "Current"
-        }
- 
-        Switch ($Theme) {
-            Current {
-                $RGB = (Get-ItemProperty 'HKCU:\Control Panel\Colors' -ErrorAction Stop).BackGround
-                if ($RGB.Length -eq 0) {
-                    $Theme = "Black" # Default to Black and don't break the switch
-                } else {
-                    $BG = $RGB -split " "
-                    $FC1 = $FC2 = @(255,255,255)
-                    $FS1=$FS2=$FontSize
-                    break
-                }
-            }
-            Blue {
-                $BG = @(58,110,165)
-                $FC1 = @(254,253,254)
-                $FC2 = @(185,190,188)
-                $FS1 = $FontSize+1
-                $FS2 = $FontSize-2
-                break
-            }
-            Grey {
-                $BG = @(77,77,77)
-                $FC1 = $FC2 = @(255,255,255)
-                $FS1=$FS2=$FontSize
-                break
-            }
-            Black {
-                $BG = @(0,0,0)
-                $FC1 = $FC2 = @(255,255,255)
-                $FS1=$FS2=$FontSize
-            }
-        }
-        Try {
-            [system.reflection.assembly]::loadWithPartialName('system.drawing.imaging') | out-null
-            [system.reflection.assembly]::loadWithPartialName('system.windows.forms') | out-null
- 
-            # Draw string > alignement
-            $sFormat = new-object system.drawing.stringformat
- 
-            Switch ($Align) {
-                Center {
-                    $sFormat.Alignment = [system.drawing.StringAlignment]::Center
-                    $sFormat.LineAlignment = [system.drawing.StringAlignment]::Center
-                    break
-                }
-                Left {
-                    $sFormat.Alignment = [system.drawing.StringAlignment]::Far
-                    $sFormat.LineAlignment = [system.drawing.StringAlignment]::Near
-                }
-            }
+## Download, save and extract latest BGInfo software to C:\BgInfo
 
-            if ($UseCurrentWallpaperAsSource) {
-                if (Test-Path -Path $wpath -PathType Leaf) {
-                    $bmp = new-object system.drawing.bitmap -ArgumentList $wpath
-                    $image = [System.Drawing.Graphics]::FromImage($bmp)
-                    $SR = $bmp | Select Width,Height
-                } else {
-                    Write-Warning -Message "Failed cannot find the current wallpaper $($wpath)"
-                    break
-                }
-            } else {
-                $SR = [System.Windows.Forms.Screen]::AllScreens | Where Primary | 
-                Select -ExpandProperty Bounds | Select Width,Height
- 
-                Write-Verbose -Message "Screen resolution is set to $($SR.Width)x$($SR.Height)" -Verbose
- 
-                # Create Bitmap
-                $bmp = new-object system.drawing.bitmap($SR.Width,$SR.Height)
-                $image = [System.Drawing.Graphics]::FromImage($bmp)
-     
-                $image.FillRectangle(
-                    (New-Object Drawing.SolidBrush (
-                        [System.Drawing.Color]::FromArgb($BG[0],$BG[1],$BG[2])
-                    )),
-                    (new-object system.drawing.rectanglef(0,0,($SR.Width),($SR.Height)))
-                )
- 
-            }
-        } Catch {
-            Write-Warning -Message "Failed to $($_.Exception.Message)"
-            break
-        }
-    }
-    Process {
- 
-        # Split our string as it can be multiline
-        $artext = ($text -split "`r`n")
-     
-        $i = 1
-        Try {
-            for ($i ; $i -le $artext.Count ; $i++) {
-                if ($i -eq 0) {
-                    #$font1 = New-Object System.Drawing.Font($FontName,$FS1,[System.Drawing.FontStyle]::Bold)
-                    #$Brush1 = New-Object Drawing.SolidBrush (
-                        #[System.Drawing.Color]::FromArgb($FC1[0],$FC1[1],$FC1[2])
-                    #)
-                    #$sz1 = [system.windows.forms.textrenderer]::MeasureText($artext[$i-1], $font1)
-                    #$rect1 = New-Object System.Drawing.RectangleF (0,($sz1.Height),$SR.Width,$SR.Height)
-                    #$image.DrawString($artext[$i-1], $font1, $brush1, $rect1, $sFormat) 
-                } else {
-                    $font2 = New-Object System.Drawing.Font($FontName,$FS2,[System.Drawing.FontStyle]::Bold)
-                    $Brush2 = New-Object Drawing.SolidBrush (
-                        [System.Drawing.Color]::FromArgb($FC2[0],$FC2[1],$FC2[2])
-                    )
-                    $sz2 = [system.windows.forms.textrenderer]::MeasureText($artext[$i-17], $font2)
-                    $rect2 = New-Object System.Drawing.RectangleF (0,($i*$FontSize*1.5 + $sz2.Height),$SR.Width,$SR.Height)
-                    $image.DrawString($artext[$i-1], $font2, $brush2, $rect2, $sFormat)
-                }
-            }
-        } Catch {
-            Write-Warning -Message "Failed to $($_.Exception.Message)"
-            break
-        }
-    }
-    End {   
-        Try { 
-            # Close Graphics
-            $image.Dispose();
- 
-            # Save and close Bitmap
-            $bmp.Save($OutFile, [system.drawing.imaging.imageformat]::Bmp);
-            $bmp.Dispose();
- 
-            # Output our file
-            Get-Item -Path $OutFile
-        } Catch {
-            Write-Warning -Message "Failed to $($_.Exception.Message)"
-            break
-        }
-    }
- 
-} # endof function
+Import-Module BitsTransfer
+Start-BitsTransfer -Source $bgInfoUrl -Destination $bgInfoZip
+Expand-Archive -LiteralPath $bgInfoZip -DestinationPath $bgInfoFolder -Force
+Remove-Item $bgInfoZip
+Remove-Item $bgInfoEula
+Write-Host ($writeEmptyLine + "# bginfo.exe available" + $writeSeperator + $time)`
+-foregroundcolor $foregroundColor1 $writeEmptyLine
 
+##-------------------------------------------------------------------------------------------------------------------------------------------------------
 
-Function Set-Wallpaper {
-    Param(
-        [Parameter(Mandatory=$true)]
-        $Path,
-         
-        [ValidateSet('Center','Stretch','Fill','Tile','Fit')]
-        $Style = 'Stretch'
-    )
-    Try {
-        if (-not ([System.Management.Automation.PSTypeName]'Wallpaper.Setter').Type) {
-            Add-Type -TypeDefinition @"
-            using System;
-            using System.Runtime.InteropServices;
-            using Microsoft.Win32;
-            namespace Wallpaper {
-                public enum Style : int {
-                Center, Stretch, Fill, Fit, Tile
-                }
-                public class Setter {
-                    public const int SetDesktopWallpaper = 20;
-                    public const int UpdateIniFile = 0x01;
-                    public const int SendWinIniChange = 0x02;
-                    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-                    private static extern int SystemParametersInfo (int uAction, int uParam, string lpvParam, int fuWinIni);
-                    public static void SetWallpaper ( string path, Wallpaper.Style style ) {
-                        SystemParametersInfo( SetDesktopWallpaper, 0, path, UpdateIniFile | SendWinIniChange );
-                        RegistryKey key = Registry.CurrentUser.OpenSubKey("Control Panel\\Desktop", true);
-                        switch( style ) {
-                            case Style.Tile :
-                                key.SetValue(@"WallpaperStyle", "0") ; 
-                                key.SetValue(@"TileWallpaper", "1") ; 
-                                break;
-                            case Style.Center :
-                                key.SetValue(@"WallpaperStyle", "0") ; 
-                                key.SetValue(@"TileWallpaper", "0") ; 
-                                break;
-                            case Style.Stretch :
-                                key.SetValue(@"WallpaperStyle", "2") ; 
-                                key.SetValue(@"TileWallpaper", "0") ;
-                                break;
-                            case Style.Fill :
-                                key.SetValue(@"WallpaperStyle", "10") ; 
-                                key.SetValue(@"TileWallpaper", "0") ; 
-                                break;
-                            case Style.Fit :
-                                key.SetValue(@"WallpaperStyle", "6") ; 
-                                key.SetValue(@"TileWallpaper", "0") ; 
-                                break;
-}
-                        key.Close();
-                    }
-                }
-            }
-"@ -ErrorAction Stop 
-            } else {
-                Write-Verbose -Message "Type already loaded" -Verbose
-            }
-        # } Catch TYPE_ALREADY_EXISTS
-        } Catch {
-            Write-Warning -Message "Failed because $($_.Exception.Message)"
-        }
-     
-    [Wallpaper.Setter]::SetWallpaper( $Path, $Style )
-}
+## Download, save and extract logon.bgi file to C:\BgInfo
 
+Invoke-WebRequest -Uri $logonBgiUrl -OutFile $logonBgiZip
+Expand-Archive -LiteralPath $logonBgiZip -DestinationPath $bgInfoFolder -Force
+Remove-Item $logonBgiZip
+Write-Host ($writeEmptyLine + "# logon.bgi available" + $writeSeperator + $time)`
+-foregroundcolor $foregroundColor1 $writeEmptyLine
 
+##-------------------------------------------------------------------------------------------------------------------------------------------------------
 
+## Create BgInfo Registry Key to AutoStart
 
+If ($regKeyExists -eq $True){Write-Host ($writeEmptyLine + "BgInfo regkey exists, script wil go on" + $writeSeperator + $time)`
+-foregroundcolor $foregroundColor2 $writeEmptyLine
+}Else{
+New-ItemProperty -Path $bgInfoRegPath -Name $bgInfoRegkey -PropertyType $bgInfoRegType -Value $bgInfoRegkeyValue
+Write-Host ($writeEmptyLine + "# BgInfo regkey added" + $writeSeperator + $time)`
+-foregroundcolor $foregroundColor1 $writeEmptyLine}
 
-#Gather information
-$WindowsVersion =(Get-ItemProperty -Path "HKLM:\HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -Name ReleaseID).ReleaseID
+##-------------------------------------------------------------------------------------------------------------------------------------------------------
 
-$BoottimeRaw = systeminfo | find "System Boot Time"
-#$Boottime = $BoottimeRaw.substring(27) 
+## Run BgInfo
 
-$env:HostIP = (
-    Get-NetIPConfiguration |
-    Where-Object {
-        $_.IPv4DefaultGateway -ne $null -and
-        $_.NetAdapter.Status -ne "Disconnected"
-    }
-).IPv4Address.IPAddress
+C:\BgInfo\Bginfo64.exe C:\BgInfo\logon.bgi /timer:0 /nolicprompt
+Write-Host ($writeEmptyLine + "# BgInfo has ran for the first time" + $writeSeperator + $time)`
+-foregroundcolor $foregroundColor1 $writeEmptyLine 
 
-#Writing info to the background
-$t = @"
-Computername: $env:COMPUTERNAME
-IP Address: $env:HostIP
-Domain: $env:USERDOMAIN
-User: $env:USERNAME
-Boot time: $Boottime
-"@ 
+##-------------------------------------------------------------------------------------------------------------------------------------------------------
 
-#Format etc
-$BGHT = @{
- Text  =  $t;
- Theme = "Black" ;
- FontName = "Segoe UI" ;
- UseCurrentWallpaperAsSource = $true ;
-}
+## Exit PowerShell window 2 seconds after completion
 
-$WallPaper = New-BGinfo @BGHT
+Write-Host ($writeEmptyLine + "# Script completed, the PowerShell window will close in 2 seconds" + $writeSeperator + $time)`
+-foregroundcolor $foregroundColor2 $writeEmptyLine
+Start-Sleep 2 
+stop-process -Id $PID 
 
-#Sets a custom background (optional)
-#Set-Wallpaper -Path "C:\Windows\Web\Wallpaper\Windows\img0.jpg" -Style Fill
+##-------------------------------------------------------------------------------------------------------------------------------------------------------
 
-
-
-#Runing the function
-Set-Wallpaper -Path $WallPaper.FullName -Style Fill
 
