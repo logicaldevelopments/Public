@@ -20,7 +20,7 @@ Function Reset-WallPaper($Value)
 
 }
 
-Reset-Wallpaper -Path "C:\Windows\Web\Wallpaper\Windows\img0.jpg" -Style Fill
+Reset-Wallpaper -Path "C:\Windows\Web\Wallpaper\Windows\img0.jpg" -Style stretch
 
 
 Function New-BGinfo {
@@ -301,10 +301,10 @@ $BGHT = @{
 $WallPaper = New-BGinfo @BGHT
 
 #Sets a custom background (optional)
-#Set-Wallpaper -Path "C:\Windows\Web\Wallpaper\Windows\img0.jpg" -Style Fill
+#Set-Wallpaper -Path "C:\Windows\Web\Wallpaper\Windows\img0.jpg" -Style stretch
 
 
 
 #Runing the function
-Set-Wallpaper -Path $WallPaper.FullName -Style Fill
+Set-Wallpaper -Path $WallPaper.FullName -Style stretch
 
